@@ -356,6 +356,10 @@ static int cpu_clk_8976_set_rate(struct clk *c, unsigned long rate)
 	struct cpu_clk_8976 *cpuclk = to_cpu_clk_8976(c);
 	bool hw_low_power_ctrl = cpuclk->hw_low_power_ctrl;
 
+	
+	// Yep, this exact function is used to set 8976 cluster clocks
+	//pr_info("clock-cpu-8976: cpu_clk_8976_set_rate: %lu \n", rate);
+
 	/*
 	 * If hardware control of the clock tree is enabled during power
 	 * collapse, setup a PM QOS request to prevent power collapse and
@@ -527,8 +531,97 @@ static struct clk_lookup cpu_clocks_8976[] = {
 	CLK_LIST(cpu_debug_pri_mux),
 };
 
+
 static struct mux_div_clk *cpussmux[] = { &a53ssmux, &a72ssmux, &ccissmux };
 static struct cpu_clk_8976 *cpuclk[] = { &a53_clk, &a72_clk, &cci_clk};
+
+extern int cpr_regulator_get_corner_voltage(struct regulator *regulator,
+		int corner);
+extern int cpr_regulator_set_corner_voltage(struct regulator *regulator,
+		int corner, int volt);
+
+extern ssize_t gpu_clock_get_vdd(char *buf, ssize_t count);
+extern ssize_t gpu_clock_set_vdd(const char *buf, ssize_t count);
+
+ssize_t cpu_clock_get_vdd(char *buf)
+{
+	ssize_t count = 0;
+	int i, uv;
+
+	if (!buf)
+		return 0;
+
+	for (i = 1; i < a53_clk.c.num_fmax; i++) {
+		uv = cpr_regulator_get_corner_voltage(
+					a53_clk.c.vdd_class->regulator[0],
+					a53_clk.c.vdd_class->vdd_uv[i]);
+		if (uv < 0)
+			return 0;
+		count += sprintf(buf + count, "A53_%lumhz: %d mV\n",
+					a53_clk.c.fmax[i] / 1000000,
+					uv / 1000);
+	}
+
+	for (i = 1; i < a72_clk.c.num_fmax; i++) {
+		uv = cpr_regulator_get_corner_voltage(
+					a72_clk.c.vdd_class->regulator[0],
+					a72_clk.c.vdd_class->vdd_uv[i]);
+		if (uv < 0)
+			return 0;
+		count += sprintf(buf + count, "A72_%lumhz: %d mV\n",
+					a72_clk.c.fmax[i] / 1000000,
+					uv / 1000);
+	}
+	
+	count = gpu_clock_get_vdd(buf, count);
+
+	return count;
+}
+
+ssize_t cpu_clock_set_vdd(const char *buf, size_t count)
+{
+	int i, mv, ret;
+	char line[32];
+
+	if (!buf)
+		return -EINVAL;
+
+	for (i = 1; i < a53_clk.c.num_fmax; i++) {
+		ret = sscanf(buf, "%d", &mv);
+		if (ret != 1)
+			return -EINVAL;
+
+		ret = cpr_regulator_set_corner_voltage(
+					a53_clk.c.vdd_class->regulator[0],
+					a53_clk.c.vdd_class->vdd_uv[i],
+					mv * 1000);
+        if (ret < 0)
+			return ret;
+
+        ret = sscanf(buf, "%s", line);
+		buf += strlen(line) + 1;
+	}
+
+	for (i = 1; i < a72_clk.c.num_fmax; i++) {
+		ret = sscanf(buf, "%d", &mv);
+		if (ret != 1)
+			return -EINVAL;
+
+		ret = cpr_regulator_set_corner_voltage(
+					a72_clk.c.vdd_class->regulator[0],
+					a72_clk.c.vdd_class->vdd_uv[i],
+					mv * 1000);
+        if (ret < 0)
+			return ret;
+
+        ret = sscanf(buf, "%s", line);
+		buf += strlen(line) + 1;
+	}
+
+	count = gpu_clock_set_vdd(buf, count);
+
+	return count;
+}
 
 static struct clk *logical_cpu_to_clk(int cpu)
 {

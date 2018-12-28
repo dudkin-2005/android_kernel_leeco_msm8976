@@ -1304,7 +1304,7 @@ static struct clk_freq_tbl ftbl_gfx3d_clk_src[] = {
 	F( 432000000,    gpll6_gfx3d,  2.5,    0,     0),
 	F( 480000000,    gpll4_gfx3d,  2.5,    0,     0),
 	F( 550000000,          gpll3,    2,    0,     0),
-	F( 600000000,    gpll4_gfx3d,    2,    0,     0),
+	F( 621330000,    gpll2_gfx3d,  1.5,    0,     0),
 	F_END
 };
 
@@ -2587,7 +2587,7 @@ static struct branch_clk gcc_oxili_gfx3d_clk = {
 		.parent = &gfx3d_clk_src.c,
 		VDD_DIG_FMAX_MAP5(LOWER, 300000000, LOW, 366670000,
 				NOMINAL, 432000000, NOM_PLUS, 480000000,
-				HIGH, 600000000),
+				HIGH, 621330000),
 		.ops = &clk_ops_branch,
 		CLK_INIT(gcc_oxili_gfx3d_clk.c),
 	},
@@ -3877,6 +3877,59 @@ static void get_gfx_version(struct platform_device *pdev, int *version)
 	*version = (efuse >> 20) & 0x1;
 
 	dev_info(&pdev->dev, "GFX-Version: %d\n", *version);
+}
+
+extern int cpr2_gfx_regulator_get_corner_voltage(struct regulator *regulator,
+               int corner);
+extern int cpr2_gfx_regulator_set_corner_voltage(struct regulator *regulator,
+               int corner, int volt);
+
+ssize_t gpu_clock_get_vdd(char *buf, ssize_t count)
+{
+       int i, uv;
+
+       if (!buf)
+               return 0;
+
+       for (i = 1; i < gfx3d_clk_src.c.num_fmax; i++) {
+               uv = cpr2_gfx_regulator_get_corner_voltage(
+                                       gfx3d_clk_src.c.vdd_class->regulator[0],
+                                       gfx3d_clk_src.c.vdd_class->vdd_uv[i]);
+               if (uv < 0)
+                       return 0;
+               count += sprintf(buf + count, "GPU_%lumhz: %d mV\n",
+                                       gfx3d_clk_src.c.fmax[i] / 1000000,
+                                       uv / 1000);
+       }
+
+       return count;
+}
+
+ssize_t gpu_clock_set_vdd(const char *buf, ssize_t count)
+{
+       int i, mv, ret;
+       char line[32];
+
+       if (!buf)
+               return -EINVAL;
+
+       for (i = 1; i < gfx3d_clk_src.c.num_fmax; i++) {
+               ret = sscanf(buf, "%d", &mv);
+               if (ret != 1)
+                       return -EINVAL;
+
+               ret = cpr2_gfx_regulator_set_corner_voltage(
+                                       gfx3d_clk_src.c.vdd_class->regulator[0],
+                                       gfx3d_clk_src.c.vdd_class->vdd_uv[i],
+                                       mv * 1000);
+        if (ret < 0)
+                       return ret;
+
+        ret = sscanf(buf, "%s", line);
+               buf += strlen(line) + 1;
+       }
+
+       return count;
 }
 
 static int of_get_fmax_vdd_class(struct platform_device *pdev, struct clk *c,

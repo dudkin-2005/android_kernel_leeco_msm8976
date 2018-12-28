@@ -1,0 +1,13 @@
+--- drivers/power/qpnp-fg.c
++++ drivers/power/qpnp-fg.c
+@@ -2058,8 +2058,8 @@ static void update_sram_data_work(struct work_struct *work)
+ #define BATT_TEMP_OFF		DISABLE_THERM_BIT
+ #define BATT_TEMP_ON		(FORCE_RBIAS_ON_BIT | TEMP_SENSE_ALWAYS_BIT | \
+ 				TEMP_SENSE_CHARGE_BIT)
+-#define TEMP_PERIOD_UPDATE_MS		10000
+-#define TEMP_PERIOD_TIMEOUT_MS		3000
++#define TEMP_PERIOD_UPDATE_MS		333 // Original value: 10000
++#define TEMP_PERIOD_TIMEOUT_MS		100 // Original value: 3000
+ static void update_temp_data(struct work_struct *work)
+ {
+ 	s16 temp;

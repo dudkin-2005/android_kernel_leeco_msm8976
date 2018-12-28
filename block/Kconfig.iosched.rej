@@ -1,0 +1,10 @@
+--- block/Kconfig.iosched
++++ block/Kconfig.iosched
+@@ -146,6 +156,7 @@ config DEFAULT_IOSCHED
+ 	default "noop" if DEFAULT_NOOP
+ 	default "maple" if DEFAULT_MAPLE
+ 	default "sioplus" if DEFAULT_SIOPLUS
++	default "zen" if DEFAULT_ZEN
+ 
+ endmenu
+ 
