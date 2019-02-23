@@ -197,6 +197,7 @@ static ssize_t uid_remove_write(struct file *file,
 
 	if (kstrtol(start_uid, 10, &start) != 0 ||
 		kstrtol(end_uid, 10, &end) != 0) {
+<<<<<<< HEAD
 		return -EINVAL;
 	}
 
@@ -206,6 +207,17 @@ static ssize_t uid_remove_write(struct file *file,
 		return -EINVAL;
 	}
 
+=======
+		return -EINVAL;
+	}
+
+#define UID_T_MAX (((uid_t)~0U)-1)
+	if ((start < 0) || (end < 0) ||
+		(start > UID_T_MAX) || (end > UID_T_MAX)) {
+		return -EINVAL;
+	}
+
+>>>>>>> ab33de991ef654e2e3539e54744a204358cdb110
 	uid_start = start;
 	uid_end = end;
 
